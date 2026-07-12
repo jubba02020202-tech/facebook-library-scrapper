@@ -1,0 +1,29 @@
+{
+  "name": "facebook-ads-lead-extractor",
+  "version": "1.0.0",
+  "description": "Facebook Ads Library Lead Extractor - Extract business leads from Facebook Ads Library",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js",
+    "postinstall": "npx playwright install chromium"
+  },
+  "keywords": [
+    "facebook",
+    "ads",
+    "lead",
+    "extractor",
+    "scraper"
+  ],
+  "license": "MIT",
+  "dependencies": {
+    "axios": "^1.18.1",
+    "cheerio": "^1.2.0",
+    "dotenv": "^17.4.2",
+    "exceljs": "^4.4.0",
+    "express": "^5.2.1",
+    "libphonenumber-js": "^1.13.8",
+    "playwright": "^1.61.1",
+    "ws": "^8.21.0"
+  }
+}
