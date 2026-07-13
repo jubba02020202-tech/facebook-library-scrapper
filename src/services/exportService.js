@@ -5,22 +5,38 @@ const { sanitizeString } = require('../utils/validators');
 
 class ExportService {
 
-  async toExcel(results) {
+  async toExcel(results, type = 'facebook') {
     const workbook = new ExcelJS.Workbook();
-    workbook.creator = 'FB Ads Lead Extractor';
+    workbook.creator = 'Lead Extractor';
     workbook.created = new Date();
 
     const ws = workbook.addWorksheet('Leads');
 
-    ws.columns = [
-      { header: 'Business Name', key: 'businessName', width: 30 },
-      { header: 'Page Name', key: 'pageName', width: 25 },
-      { header: 'Website URL', key: 'websiteUrl', width: 40 },
-      { header: 'Phone Number', key: 'phone', width: 25 },
-      { header: 'WhatsApp Link', key: 'whatsappLink', width: 35 },
-      { header: 'CTA', key: 'cta', width: 18 },
-      { header: 'Ad Link', key: 'adLink', width: 40 },
-    ];
+    if (type === 'google_maps') {
+      ws.columns = [
+        { header: 'Business Name', key: 'businessName', width: 30 },
+        { header: 'Address', key: 'address', width: 35 },
+        { header: 'Category', key: 'cta', width: 20 },
+        { header: 'Website URL', key: 'websiteUrl', width: 40 },
+        { header: 'Email', key: 'email', width: 35 },
+        { header: 'Phone Number', key: 'phone', width: 25 },
+        { header: 'WhatsApp Link', key: 'whatsappLink', width: 35 },
+        { header: 'Rating', key: 'rating', width: 10 },
+        { header: 'Reviews', key: 'reviews', width: 12 },
+        { header: 'Hours', key: 'hours', width: 30 },
+      ];
+    } else {
+      ws.columns = [
+        { header: 'Business Name', key: 'businessName', width: 30 },
+        { header: 'Page Name', key: 'pageName', width: 25 },
+        { header: 'Website URL', key: 'websiteUrl', width: 40 },
+        { header: 'Email', key: 'email', width: 35 },
+        { header: 'Phone Number', key: 'phone', width: 25 },
+        { header: 'WhatsApp Link', key: 'whatsappLink', width: 35 },
+        { header: 'CTA', key: 'cta', width: 18 },
+        { header: 'Ad Link', key: 'adLink', width: 40 },
+      ];
+    }
 
     const headerRow = ws.getRow(1);
     headerRow.font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 12 };
@@ -38,38 +54,40 @@ class ExportService {
     for (const row of results) {
       const phones = row.phones || [];
       const waLinks = row.whatsappLinks || [];
+      const emails = row.emails || [];
 
-      if (phones.length === 0 && waLinks.length === 0) {
-        const dataRow = ws.addRow({
-          businessName: sanitizeString(row.businessName) || '—',
-          pageName: sanitizeString(row.pageName) || '—',
-          websiteUrl: row.websiteUrl || '—',
-          phone: '—',
-          whatsappLink: '—',
-          cta: sanitizeString(row.cta) || '—',
-          adLink: row.adLink || '—',
-        });
-        dataRow.alignment = { vertical: 'top', wrapText: true };
-        dataRow.getCell(4).numFmt = '@';
-        dataRow.getCell(5).numFmt = '@';
-        continue;
-      }
-
-      const maxRows = Math.max(phones.length, waLinks.length || 1);
+      const maxRows = Math.max(phones.length, waLinks.length || 1, emails.length || 1);
 
       for (let i = 0; i < maxRows; i++) {
-        const dataRow = ws.addRow({
-          businessName: sanitizeString(row.businessName) || '—',
-          pageName: sanitizeString(row.pageName) || '—',
-          websiteUrl: row.websiteUrl || '—',
-          phone: i < phones.length ? phones[i] : '',
-          whatsappLink: i < waLinks.length ? (waLinks[i].link || waLinks[i]) : '',
-          cta: i === 0 ? (sanitizeString(row.cta) || '—') : '',
-          adLink: i === 0 ? (row.adLink || '—') : '',
-        });
+        let dataRow;
+
+        if (type === 'google_maps') {
+          dataRow = ws.addRow({
+            businessName: i === 0 ? (sanitizeString(row.businessName) || '—') : '',
+            address: i === 0 ? (row.address || '—') : '',
+            cta: i === 0 ? (sanitizeString(row.cta) || '—') : '',
+            websiteUrl: i === 0 ? (row.websiteUrl || '—') : '',
+            email: i < emails.length ? emails[i] : '',
+            phone: i < phones.length ? phones[i] : '',
+            whatsappLink: i < waLinks.length ? (waLinks[i].link || waLinks[i]) : '',
+            rating: i === 0 ? (row.rating || '—') : '',
+            reviews: i === 0 ? (row.reviews || '—') : '',
+            hours: i === 0 ? (row.hours || '—') : '',
+          });
+        } else {
+          dataRow = ws.addRow({
+            businessName: i === 0 ? (sanitizeString(row.businessName) || '—') : '',
+            pageName: i === 0 ? (sanitizeString(row.pageName) || '—') : '',
+            websiteUrl: i === 0 ? (row.websiteUrl || '—') : '',
+            email: i < emails.length ? emails[i] : '',
+            phone: i < phones.length ? phones[i] : '',
+            whatsappLink: i < waLinks.length ? (waLinks[i].link || waLinks[i]) : '',
+            cta: i === 0 ? (sanitizeString(row.cta) || '—') : '',
+            adLink: i === 0 ? (row.adLink || '—') : '',
+          });
+        }
+
         dataRow.alignment = { vertical: 'top', wrapText: true };
-        dataRow.getCell(4).numFmt = '@';
-        dataRow.getCell(5).numFmt = '@';
       }
     }
 

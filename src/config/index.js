@@ -31,6 +31,15 @@ module.exports = {
     maxLinksPerSite: parseInt(process.env.CRAWL_MAX_LINKS, 10) || 20,
   },
 
+  googleMaps: {
+    scrollDelay: parseInt(process.env.GM_SCROLL_DELAY, 10) || 2000,
+    maxScrolls: parseInt(process.env.GM_MAX_SCROLLS, 10) || 200,
+    headless: process.env.GM_HEADLESS !== 'false',
+    waitAfterLoad: parseInt(process.env.GM_WAIT_AFTER_LOAD, 10) || 5000,
+    maxConcurrent: parseInt(process.env.GM_MAX_CONCURRENT, 10) || 3,
+    maxRetries: parseInt(process.env.GM_MAX_RETRIES, 10) || 2,
+  },
+
   userAgent:
     'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36',
 };

@@ -63,6 +63,20 @@ body {
   margin: 1px;
 }
 
+.email-badge {
+  display: inline-block;
+  background: rgba(163, 113, 247, 0.15);
+  color: #c084fc;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 0.8rem;
+  margin: 1px;
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .whatsapp-badge {
   display: inline-block;
   background: rgba(37, 211, 102, 0.15);
@@ -76,6 +90,20 @@ body {
 .error-cell {
   color: #f87171;
   font-size: 0.85rem;
+}
+
+.text-purple {
+  color: #a78bfa !important;
+}
+
+.bg-purple {
+  --bs-bg-opacity: 1;
+  background-color: rgba(163, 113, 247, 0.1) !important;
+}
+
+.border-purple {
+  --bs-border-opacity: 1;
+  border-color: rgba(163, 113, 247, 0.5) !important;
 }
 
 .pagination .page-link {
@@ -141,4 +169,70 @@ body {
 
 ::-webkit-scrollbar-thumb:hover {
   background: #4a4f55;
+}
+
+.nav-tabs {
+  border-bottom: 2px solid #373b3e;
+}
+
+.nav-tabs .nav-link {
+  color: #6c757d;
+  border: 1px solid transparent;
+  border-radius: 8px 8px 0 0;
+  padding: 10px 20px;
+  font-weight: 500;
+  transition: all 0.2s;
+}
+
+.nav-tabs .nav-link:hover {
+  color: #e1e3e6;
+  border-color: #495057 #495057 transparent;
+  background-color: rgba(255,255,255,0.03);
+}
+
+.nav-tabs .nav-link.active {
+  color: #fff;
+  background-color: #212529;
+  border-color: #373b3e #373b3e #212529;
+  border-bottom-color: #212529;
+}
+
+.nav-tabs .nav-link.active.text-primary {
+  border-top: 2px solid #0d6efd;
+}
+
+.nav-tabs .nav-link.active .text-success {
+  color: #198754 !important;
+}
+
+.form-control:focus,
+.form-select:focus {
+  border-color: #0d6efd;
+  box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.25);
+}
+
+.card.border-success {
+  border-color: #198754 !important;
+}
+
+.card.border-primary {
+  border-color: #0d6efd !important;
+}
+
+.badge.bg-success {
+  background-color: #198754 !important;
+}
+
+.list-group-item {
+  background-color: #212529;
+  border-color: #373b3e;
+}
+
+.list-group-item:hover {
+  background-color: #2b3035;
+}
+
+.list-group-item.active {
+  background-color: #0d6efd;
+  border-color: #0d6efd;
 }

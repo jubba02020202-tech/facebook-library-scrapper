@@ -1,6 +1,7 @@
 const { chromium } = require('playwright');
 const config = require('../config');
 const { extractPhonesFromText, extractWhatsAppLinks } = require('../utils/phoneExtractor');
+const { extractEmailsFromText } = require('../utils/emailExtractor');
 
 const LOG_PREFIX = '[FB]';
 
@@ -200,6 +201,7 @@ class FacebookAdsScraper {
 
         const phones = extractPhonesFromText(fullText);
         const waLinks = extractWhatsAppLinks(fullBlock);
+        const emails = extractEmailsFromText(fullText);
 
         const ctaWords = ['shop now', 'book now', 'order now', 'buy now',
           'visit website', 'learn more', 'sign up', 'get started',
@@ -217,6 +219,7 @@ class FacebookAdsScraper {
           adLink,
           phones,
           whatsappLinks: waLinks,
+          emails,
         });
 
       } catch (err) {

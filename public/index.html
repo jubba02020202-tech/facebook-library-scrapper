@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Facebook Ads Lead Extractor</title>
+  <title>Lead Extractor - Facebook Ads & Google Maps</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
   <link href="/css/style.css" rel="stylesheet">
@@ -13,7 +13,8 @@
   <nav class="navbar navbar-dark bg-dark border-bottom border-secondary sticky-top">
     <div class="container-fluid">
       <span class="navbar-brand mb-0 h1">
-        <i class="bi bi-facebook me-2"></i>Somalirank.com FB Ads Lead Extractor
+        <i class="bi bi-geo-alt-fill me-2 text-primary"></i>Lead Extractor
+        <small class="text-muted ms-2 fw-normal">Facebook Ads & Google Maps</small>
       </span>
       <span class="badge bg-info" id="connectionStatus">Connecting...</span>
     </div>
@@ -21,27 +22,117 @@
 
   <main class="container-fluid py-4">
 
-    <div class="row mb-4">
-      <div class="col-12">
-        <div class="card border-primary">
-          <div class="card-body">
-            <h5 class="card-title"><i class="bi bi-link-45deg me-2"></i>Facebook Ads Library URL</h5>
-            <div class="input-group mb-2">
-              <input type="url" class="form-control form-control-lg" id="adsUrl"
-                placeholder="https://www.facebook.com/ads/library/?active_status=all&ad_type=all&country=ALL&view_all_page_id=..."
-                value="">
-              <button class="btn btn-primary btn-lg" id="startBtn" onclick="startExtraction()">
-                <i class="bi bi-play-fill me-1"></i>Start Extraction
-              </button>
-            </div>
-            <div class="form-text">
-              <i class="bi bi-info-circle me-1"></i>
-              Go to <a href="https://www.facebook.com/ads/library/" target="_blank" class="text-info">Facebook Ads Library</a>,
-              select your country and filters, then copy the full URL.
+    <ul class="nav nav-tabs mb-4" id="scraperTabs" role="tablist">
+      <li class="nav-item" role="presentation">
+        <button class="nav-link active" id="facebook-tab" data-bs-toggle="tab" data-bs-target="#facebookPanel"
+          type="button" role="tab" aria-controls="facebookPanel" aria-selected="true">
+          <i class="bi bi-facebook me-1 text-primary"></i>Facebook Ads Library
+        </button>
+      </li>
+      <li class="nav-item" role="presentation">
+        <button class="nav-link" id="google-tab" data-bs-toggle="tab" data-bs-target="#googlePanel"
+          type="button" role="tab" aria-controls="googlePanel" aria-selected="false">
+          <i class="bi bi-geo-alt me-1 text-success"></i>Google Maps
+        </button>
+      </li>
+    </ul>
+
+    <div class="tab-content" id="scraperTabContent">
+
+      <div class="tab-pane fade show active" id="facebookPanel" role="tabpanel" aria-labelledby="facebook-tab">
+        <div class="row mb-4">
+          <div class="col-12">
+            <div class="card border-primary">
+              <div class="card-body">
+                <h5 class="card-title"><i class="bi bi-link-45deg me-2"></i>Facebook Ads Library URL</h5>
+                <div class="input-group mb-2">
+                  <input type="url" class="form-control form-control-lg" id="adsUrl"
+                    placeholder="https://www.facebook.com/ads/library/?active_status=all&ad_type=all&country=ALL..."
+                    value="">
+                  <button class="btn btn-primary btn-lg" id="startBtn" onclick="startExtraction()">
+                    <i class="bi bi-play-fill me-1"></i>Start Extraction
+                  </button>
+                </div>
+                <div class="form-text">
+                  <i class="bi bi-info-circle me-1"></i>
+                  Go to <a href="https://www.facebook.com/ads/library/" target="_blank" class="text-info">Facebook Ads Library</a>,
+                  select your country and filters, then copy the full URL.
+                </div>
+              </div>
             </div>
           </div>
         </div>
       </div>
+
+      <div class="tab-pane fade" id="googlePanel" role="tabpanel" aria-labelledby="google-tab">
+        <div class="row mb-4">
+          <div class="col-12">
+            <div class="card border-success">
+              <div class="card-body">
+                <h5 class="card-title"><i class="bi bi-geo-alt me-2"></i>Google Maps Business Search</h5>
+                <div class="row g-3">
+                  <div class="col-md-3">
+                    <label class="form-label small text-muted">Country *</label>
+                    <input type="text" class="form-control" id="gmCountry" placeholder="e.g. Somalia">
+                  </div>
+                  <div class="col-md-3">
+                    <label class="form-label small text-muted">City / Region</label>
+                    <input type="text" class="form-control" id="gmCity" placeholder="e.g. Mogadishu">
+                  </div>
+                  <div class="col-md-4">
+                    <label class="form-label small text-muted">Business Type *</label>
+                    <input type="text" class="form-control" id="gmBusinessType" list="businessTypes"
+                      placeholder="e.g. Hospital, Restaurant...">
+                    <datalist id="businessTypes">
+                      <option value="Hospital">
+                      <option value="Clinic">
+                      <option value="Pharmacy">
+                      <option value="Restaurant">
+                      <option value="Hotel">
+                      <option value="School">
+                      <option value="University">
+                      <option value="Supermarket">
+                      <option value="Shopping Mall">
+                      <option value="Salon">
+                      <option value="Spa">
+                      <option value="Gym">
+                      <option value="Garage">
+                      <option value="Auto Repair">
+                      <option value="Law Firm">
+                      <option value="Insurance">
+                      <option value="Real Estate">
+                      <option value="Travel Agency">
+                      <option value="Bank">
+                      <option value="Coffee Shop">
+                      <option value="Bakery">
+                      <option value="Gym">
+                      <option value="Dentist">
+                      <option value="Veterinary">
+                      <option value="Pet Shop">
+                      <option value="Electronics Store">
+                      <option value="Furniture Store">
+                      <option value="Clothing Store">
+                      <option value="Bookstore">
+                      <option value="Gas Station">
+                      <option value="Car Dealership">
+                    </datalist>
+                  </div>
+                  <div class="col-md-2 d-flex align-items-end">
+                    <button class="btn btn-success btn-lg w-100" id="gmStartBtn" onclick="startGoogleExtraction()">
+                      <i class="bi bi-search me-1"></i>Search
+                    </button>
+                  </div>
+                </div>
+                <div class="form-text mt-2">
+                  <i class="bi bi-info-circle me-1"></i>
+                  Enter a country and business type to find all businesses on Google Maps. City is optional.
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
     </div>
 
     <div class="row mb-4" id="progressSection" style="display:none;">
@@ -63,34 +154,50 @@
     </div>
 
     <div class="row mb-4" id="statsSection" style="display:none;">
-      <div class="col-md-3 col-6 mb-2">
+      <div class="col-md-2 col-6 mb-2">
         <div class="card bg-success bg-opacity-10 border-success h-100">
-          <div class="card-body text-center">
-            <h2 class="mb-0 text-success" id="totalBusinesses">0</h2>
-            <small class="text-muted">Businesses Found</small>
+          <div class="card-body text-center py-3">
+            <h3 class="mb-0 text-success" id="totalBusinesses">0</h3>
+            <small class="text-muted">Businesses</small>
           </div>
         </div>
       </div>
-      <div class="col-md-3 col-6 mb-2">
+      <div class="col-md-2 col-6 mb-2">
         <div class="card bg-info bg-opacity-10 border-info h-100">
-          <div class="card-body text-center">
-            <h2 class="mb-0 text-info" id="totalPhones">0</h2>
-            <small class="text-muted">Phone Numbers</small>
+          <div class="card-body text-center py-3">
+            <h3 class="mb-0 text-info" id="totalPhones">0</h3>
+            <small class="text-muted">Phones</small>
           </div>
         </div>
       </div>
-      <div class="col-md-3 col-6 mb-2">
+      <div class="col-md-2 col-6 mb-2">
         <div class="card bg-warning bg-opacity-10 border-warning h-100">
-          <div class="card-body text-center">
-            <h2 class="mb-0 text-warning" id="totalWithPhones">0</h2>
+          <div class="card-body text-center py-3">
+            <h3 class="mb-0 text-warning" id="totalWithPhones">0</h3>
             <small class="text-muted">With Phones</small>
           </div>
         </div>
       </div>
-      <div class="col-md-3 col-6 mb-2">
+      <div class="col-md-2 col-6 mb-2">
+        <div class="card bg-purple bg-opacity-10 border-purple h-100">
+          <div class="card-body text-center py-3">
+            <h3 class="mb-0 text-purple" id="totalEmails">0</h3>
+            <small class="text-muted">Emails</small>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-2 col-6 mb-2">
+        <div class="card bg-info bg-opacity-10 border-info h-100">
+          <div class="card-body text-center py-3">
+            <h3 class="mb-0 text-info" id="totalWithPhones2">0</h3>
+            <small class="text-muted">With Emails</small>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-2 col-6 mb-2">
         <div class="card bg-danger bg-opacity-10 border-danger h-100">
-          <div class="card-body text-center">
-            <h2 class="mb-0 text-danger" id="totalErrors">0</h2>
+          <div class="card-body text-center py-3">
+            <h3 class="mb-0 text-danger" id="totalErrors">0</h3>
             <small class="text-muted">Errors</small>
           </div>
         </div>
@@ -103,6 +210,7 @@
           <button class="btn btn-outline-success" onclick="exportExcel()">
             <i class="bi bi-file-earmark-excel me-1"></i>Export Excel
           </button>
+          <span class="text-muted small align-self-center" id="exportInfo"></span>
         </div>
       </div>
     </div>
@@ -123,6 +231,8 @@
                   <option value="all">All</option>
                   <option value="withPhones">With Phones</option>
                   <option value="withoutPhones">Without Phones</option>
+                  <option value="withEmails">With Emails</option>
+                  <option value="withoutEmails">Without Emails</option>
                 </select>
                 <select class="form-select form-select-sm" id="pageSize" style="width:auto;" onchange="renderTable()">
                   <option value="10">10 per page</option>
@@ -135,17 +245,7 @@
 
             <div class="table-responsive">
               <table class="table table-dark table-striped table-hover align-middle" id="dataTable">
-                <thead>
-                  <tr>
-                    <th class="sortable" onclick="sortTable('businessName')">Business <i class="bi bi-arrow-down-up"></i></th>
-                    <th class="sortable" onclick="sortTable('pageName')">Page <i class="bi bi-arrow-down-up"></i></th>
-                    <th class="sortable" onclick="sortTable('websiteUrl')">Website <i class="bi bi-arrow-down-up"></i></th>
-                    <th>CTA</th>
-                    <th>Phones</th>
-                    <th>WhatsApp</th>
-                    <th>Status</th>
-                  </tr>
-                </thead>
+                <thead id="tableHead"></thead>
                 <tbody id="tableBody"></tbody>
               </table>
             </div>

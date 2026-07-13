@@ -3,6 +3,7 @@ const router = express.Router();
 const controller = require('../controllers/extractController');
 
 router.post('/extract', controller.startExtraction);
+router.post('/extract/google', controller.startGoogleExtraction);
 router.get('/status/:sessionId', controller.getStatus);
 router.get('/export/:sessionId', controller.getExport);
 router.get('/sessions', controller.getSessions);

@@ -6,11 +6,11 @@ let pageSize = 25;
 let sortColumn = '';
 let sortDirection = 'asc';
 let ws = null;
+let currentScraperType = 'facebook';
 
 function connectWebSocket() {
   const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
   const wsUrl = `${protocol}//${window.location.host}`;
-
   ws = new WebSocket(wsUrl);
 
   ws.onopen = () => {
@@ -21,9 +21,7 @@ function connectWebSocket() {
   ws.onmessage = (event) => {
     try {
       const data = JSON.parse(event.data);
-      if (data.type === 'progress') {
-        handleProgress(data);
-      }
+      if (data.type === 'progress') handleProgress(data);
     } catch (e) {
       console.error('WS parse error:', e);
     }
@@ -56,38 +54,77 @@ function handleProgress(data) {
 
   if (data.step === 'facebook') {
     progressLabel.textContent = 'Scrolling Facebook Ads Library...';
+    progressBar.className = 'progress-bar progress-bar-striped progress-bar-animated';
     progressDetail.textContent = `Found ${data.adsFound || 0} ads (scroll ${data.scrolls || 0})`;
   } else if (data.step === 'facebook_details') {
     progressLabel.textContent = 'Opening ads for details...';
     progressBar.className = 'progress-bar progress-bar-striped progress-bar-animated bg-warning';
-    progressDetail.textContent = `Opening ad ${data.current || 0}/${data.total || 0} (${data.adsFound || 0} extracted)`;
+    progressDetail.textContent = `Opening ad ${data.current || 0}/${data.total || 0}`;
   } else if (data.step === 'facebook_done') {
     progressLabel.textContent = 'Facebook Ads Scanned';
+    progressBar.className = 'progress-bar bg-success';
+    progressDetail.textContent = data.message || '';
+  } else if (data.step === 'maps_scroll') {
+    progressLabel.textContent = 'Scrolling Google Maps...';
+    progressBar.className = 'progress-bar progress-bar-striped progress-bar-animated bg-success';
+    progressDetail.textContent = `${data.businessesFound || 0} results found (scroll ${data.scrolls || 0})`;
+  } else if (data.step === 'maps_extract') {
+    progressLabel.textContent = 'Extracting Business Details...';
+    progressBar.className = 'progress-bar progress-bar-striped progress-bar-animated bg-warning';
+    progressDetail.textContent = `Business ${data.current || 0}/${data.total || 0}`;
+  } else if (data.step === 'maps_done') {
+    progressLabel.textContent = 'Google Maps Scanned';
     progressBar.className = 'progress-bar bg-success';
     progressDetail.textContent = data.message || '';
   } else if (data.step === 'crawling') {
     progressLabel.textContent = 'Visiting Websites...';
     progressBar.className = 'progress-bar progress-bar-striped progress-bar-animated bg-info';
-    progressDetail.textContent = `${data.message || ''}`;
+    progressDetail.textContent = data.message || '';
   } else if (data.step === 'completed') {
     progressLabel.textContent = 'Extraction Complete!';
     progressBar.className = 'progress-bar bg-success';
     progressDetail.textContent = data.message || 'Done!';
 
-    document.getElementById('startBtn').disabled = false;
-    document.getElementById('startBtn').innerHTML = '<i class="bi bi-play-fill me-1"></i>Start Extraction';
+    const btn = getActiveStartBtn();
+    btn.disabled = false;
+    btn.innerHTML = currentScraperType === 'google_maps'
+      ? '<i class="bi bi-search me-1"></i>Search'
+      : '<i class="bi bi-play-fill me-1"></i>Start Extraction';
 
     if (data.results) {
       currentData = data.results;
-      displayResults(data.results, data.totalBusinesses, data.totalPhones);
+      displayResults(data.results, data.totalBusinesses, data.totalPhones, data.totalEmails);
     }
   } else if (data.step === 'error') {
     progressLabel.textContent = 'Error';
     progressBar.className = 'progress-bar bg-danger';
     progressDetail.textContent = data.message || 'An error occurred';
-    document.getElementById('startBtn').disabled = false;
-    document.getElementById('startBtn').innerHTML = '<i class="bi bi-play-fill me-1"></i>Start Extraction';
+    const btn = getActiveStartBtn();
+    btn.disabled = false;
+    btn.innerHTML = currentScraperType === 'google_maps'
+      ? '<i class="bi bi-search me-1"></i>Search'
+      : '<i class="bi bi-play-fill me-1"></i>Start Extraction';
   }
+}
+
+function getActiveStartBtn() {
+  return currentScraperType === 'google_maps'
+    ? document.getElementById('gmStartBtn')
+    : document.getElementById('startBtn');
+}
+
+function resetUI() {
+  document.getElementById('progressSection').style.display = 'block';
+  document.getElementById('statsSection').style.display = 'none';
+  document.getElementById('tableSection').style.display = 'none';
+  document.getElementById('exportSection').style.display = 'none';
+
+  const progressBar = document.getElementById('progressBar');
+  progressBar.style.width = '0%';
+  progressBar.className = 'progress-bar progress-bar-striped progress-bar-animated';
+  document.getElementById('progressPercent').textContent = '0%';
+  document.getElementById('progressLabel').textContent = 'Starting...';
+  document.getElementById('progressDetail').textContent = '';
 }
 
 async function startExtraction() {
@@ -100,21 +137,11 @@ async function startExtraction() {
     return;
   }
 
+  currentScraperType = 'facebook';
   const btn = document.getElementById('startBtn');
   btn.disabled = true;
   btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Extracting...';
-
-  document.getElementById('progressSection').style.display = 'block';
-  document.getElementById('statsSection').style.display = 'none';
-  document.getElementById('tableSection').style.display = 'none';
-  document.getElementById('exportSection').style.display = 'none';
-
-  const progressBar = document.getElementById('progressBar');
-  progressBar.style.width = '0%';
-  progressBar.className = 'progress-bar progress-bar-striped progress-bar-animated';
-  document.getElementById('progressPercent').textContent = '0%';
-  document.getElementById('progressLabel').textContent = 'Starting...';
-  document.getElementById('progressDetail').textContent = '';
+  resetUI();
 
   try {
     const response = await fetch('/api/extract', {
@@ -124,7 +151,6 @@ async function startExtraction() {
     });
 
     const result = await response.json();
-
     if (!response.ok) {
       showToast('danger', result.error || 'Failed to start extraction');
       btn.disabled = false;
@@ -135,7 +161,6 @@ async function startExtraction() {
     currentSessionId = result.sessionId;
     showToast('success', 'Extraction started! Session: ' + currentSessionId);
     loadSessions();
-
   } catch (err) {
     showToast('danger', 'Network error: ' + err.message);
     btn.disabled = false;
@@ -143,23 +168,54 @@ async function startExtraction() {
   }
 }
 
-async function pollStatus(sessionId) {
+async function startGoogleExtraction() {
+  const country = document.getElementById('gmCountry').value.trim();
+  const city = document.getElementById('gmCity').value.trim();
+  const businessType = document.getElementById('gmBusinessType').value.trim();
+
+  if (!country) {
+    showToast('warning', 'Please enter a country');
+    document.getElementById('gmCountry').focus();
+    return;
+  }
+  if (!businessType) {
+    showToast('warning', 'Please enter a business type');
+    document.getElementById('gmBusinessType').focus();
+    return;
+  }
+
+  currentScraperType = 'google_maps';
+  const btn = document.getElementById('gmStartBtn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Searching...';
+  resetUI();
+
   try {
-    const response = await fetch(`/api/status/${sessionId}`);
-    if (!response.ok) return;
+    const response = await fetch('/api/extract/google', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ country, city, businessType }),
+    });
 
-    const data = await response.json();
-
-    if (data.status === 'completed') {
-      currentData = data.results || [];
-      displayResults(currentData, data.totalBusinesses, data.totalPhones);
-      document.getElementById('startBtn').disabled = false;
-      document.getElementById('startBtn').innerHTML = '<i class="bi bi-play-fill me-1"></i>Start Extraction';
+    const result = await response.json();
+    if (!response.ok) {
+      showToast('danger', result.error || 'Failed to start search');
+      btn.disabled = false;
+      btn.innerHTML = '<i class="bi bi-search me-1"></i>Search';
+      return;
     }
-  } catch (e) {}
+
+    currentSessionId = result.sessionId;
+    showToast('success', 'Google Maps search started!');
+    loadSessions();
+  } catch (err) {
+    showToast('danger', 'Network error: ' + err.message);
+    btn.disabled = false;
+    btn.innerHTML = '<i class="bi bi-search me-1"></i>Search';
+  }
 }
 
-function displayResults(results, totalBusinesses, totalPhones) {
+function displayResults(results, totalBusinesses, totalPhones, totalEmails) {
   currentData = results || [];
   filteredData = [...currentData];
   currentPage = 1;
@@ -168,22 +224,63 @@ function displayResults(results, totalBusinesses, totalPhones) {
   document.getElementById('tableSection').style.display = 'block';
 
   document.getElementById('totalBusinesses').textContent = totalBusinesses || 0;
-
-  const phonesCount = totalPhones || 0;
-  document.getElementById('totalPhones').textContent = phonesCount;
+  document.getElementById('totalPhones').textContent = totalPhones || 0;
 
   const withPhones = results ? results.filter(r => r.phones && r.phones.length > 0).length : 0;
   document.getElementById('totalWithPhones').textContent = withPhones;
 
+  document.getElementById('totalEmails').textContent = totalEmails || 0;
+  const withEmails = results ? results.filter(r => r.emails && r.emails.length > 0).length : 0;
+  document.getElementById('totalWithPhones2').textContent = withEmails;
+
   const errors = results ? results.filter(r => r.error).length : 0;
   document.getElementById('totalErrors').textContent = errors;
+
+  const hasAddress = results && results.length > 0 && results[0].address !== undefined;
+  document.getElementById('exportInfo').textContent = hasAddress
+    ? 'Google Maps leads'
+    : 'Facebook Ads leads';
 
   if (results && results.length > 0) {
     document.getElementById('exportSection').style.display = 'block';
   }
 
+  updateTableHeaders();
   filterTable();
   loadSessions();
+}
+
+function updateTableHeaders() {
+  const thead = document.getElementById('tableHead');
+  const firstRow = currentData[0];
+  const isGoogleMaps = firstRow && firstRow.address !== undefined;
+
+  if (isGoogleMaps) {
+    thead.innerHTML = `
+      <tr>
+        <th class="sortable" onclick="sortTable('businessName')">Business <i class="bi bi-arrow-down-up"></i></th>
+        <th>Address</th>
+        <th>Category</th>
+        <th class="sortable" onclick="sortTable('websiteUrl')">Website <i class="bi bi-arrow-down-up"></i></th>
+        <th>Emails</th>
+        <th>Phones</th>
+        <th>WhatsApp</th>
+        <th>Rating</th>
+        <th>Status</th>
+      </tr>`;
+  } else {
+    thead.innerHTML = `
+      <tr>
+        <th class="sortable" onclick="sortTable('businessName')">Business <i class="bi bi-arrow-down-up"></i></th>
+        <th class="sortable" onclick="sortTable('pageName')">Page <i class="bi bi-arrow-down-up"></i></th>
+        <th class="sortable" onclick="sortTable('websiteUrl')">Website <i class="bi bi-arrow-down-up"></i></th>
+        <th>CTA</th>
+        <th>Emails</th>
+        <th>Phones</th>
+        <th>WhatsApp</th>
+        <th>Status</th>
+      </tr>`;
+  }
 }
 
 function filterTable() {
@@ -193,12 +290,16 @@ function filterTable() {
   filteredData = currentData.filter((row) => {
     if (phoneFilter === 'withPhones' && (!row.phones || row.phones.length === 0)) return false;
     if (phoneFilter === 'withoutPhones' && row.phones && row.phones.length > 0) return false;
+    if (phoneFilter === 'withEmails' && (!row.emails || row.emails.length === 0)) return false;
+    if (phoneFilter === 'withoutEmails' && row.emails && row.emails.length > 0) return false;
 
     if (searchTerm) {
+      const emailTexts = (row.emails || []);
       const phoneTexts = (row.phones || []);
       const searchable = [
         row.businessName, row.pageName, row.websiteUrl, row.cta,
-        ...phoneTexts,
+        row.address || '',
+        ...phoneTexts, ...emailTexts,
       ].join(' ').toLowerCase();
       return searchable.includes(searchTerm);
     }
@@ -226,7 +327,8 @@ function renderTable() {
   tbody.innerHTML = '';
 
   if (pageData.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted py-4">No results found</td></tr>';
+    const colSpan = document.querySelectorAll('#tableHead th').length || 8;
+    tbody.innerHTML = `<tr><td colspan="${colSpan}" class="text-center text-muted py-4">No results found</td></tr>`;
     renderPagination(1, 0);
     return;
   }
@@ -241,29 +343,60 @@ function renderTable() {
     });
   }
 
+  const firstRow = currentData[0];
+  const isGoogleMaps = firstRow && firstRow.address !== undefined;
+
   sorted.forEach((row) => {
     const tr = document.createElement('tr');
-
     const hasPhones = row.phones && row.phones.length > 0;
     const hasWhatsApp = row.whatsappLinks && row.whatsappLinks.length > 0;
+    const hasEmails = row.emails && row.emails.length > 0;
 
-    tr.innerHTML = `
-      <td><strong>${escapeHtml(row.businessName || '—')}</strong></td>
-      <td>${escapeHtml(row.pageName || '—')}</td>
-      <td>
-        ${row.websiteUrl ? `<a href="${escapeHtml(row.websiteUrl)}" target="_blank" class="text-info text-break">${escapeHtml(truncateUrl(row.websiteUrl))}</a>` : '<span class="text-muted">—</span>'}
-      </td>
-      <td>${row.cta ? `<span class="badge bg-primary">${escapeHtml(row.cta)}</span>` : '—'}</td>
-      <td>
-        ${hasPhones ? row.phones.map(p => `<span class="phone-badge">${escapeHtml(p)}</span>`).join('') : '<span class="text-muted">—</span>'}
-      </td>
-      <td>
-        ${hasWhatsApp ? row.whatsappLinks.map(w => `<a href="${escapeHtml(w.link)}" target="_blank" class="whatsapp-badge"><i class="bi bi-whatsapp me-1"></i>WA</a>`).join('') : '<span class="text-muted">—</span>'}
-      </td>
-      <td>
-        ${row.error ? `<span class="error-cell"><i class="bi bi-exclamation-triangle me-1"></i>Error</span>` : '<span class="text-success"><i class="bi bi-check-circle"></i></span>'}
-      </td>
-    `;
+    const emailHtml = hasEmails
+      ? row.emails.map(e => `<span class="email-badge"><i class="bi bi-envelope me-1"></i>${escapeHtml(e)}</span>`).join('')
+      : '<span class="text-muted">&mdash;</span>';
+
+    const phoneHtml = hasPhones
+      ? row.phones.map(p => `<span class="phone-badge">${escapeHtml(p)}</span>`).join('')
+      : '<span class="text-muted">&mdash;</span>';
+
+    const waHtml = hasWhatsApp
+      ? row.whatsappLinks.map(w => `<a href="${escapeHtml(w.link)}" target="_blank" class="whatsapp-badge"><i class="bi bi-whatsapp me-1"></i>WA</a>`).join('')
+      : '<span class="text-muted">&mdash;</span>';
+
+    const statusHtml = row.error
+      ? `<span class="error-cell"><i class="bi bi-exclamation-triangle me-1"></i>Error</span>`
+      : '<span class="text-success"><i class="bi bi-check-circle"></i></span>';
+
+    if (isGoogleMaps) {
+      tr.innerHTML = `
+        <td><strong>${escapeHtml(row.businessName || '—')}</strong></td>
+        <td><small>${escapeHtml(row.address || '—')}</small></td>
+        <td>${row.cta ? `<span class="badge bg-secondary">${escapeHtml(row.cta)}</span>` : '—'}</td>
+        <td>
+          ${row.websiteUrl ? `<a href="${escapeHtml(row.websiteUrl)}" target="_blank" class="text-info text-break">${escapeHtml(truncateUrl(row.websiteUrl))}</a>` : '<span class="text-muted">—</span>'}
+        </td>
+        <td>${emailHtml}</td>
+        <td>${phoneHtml}</td>
+        <td>${waHtml}</td>
+        <td>${row.rating ? `<span class="badge bg-warning text-dark">${escapeHtml(row.rating)} <i class="bi bi-star-fill"></i></span>` : '—'} ${row.reviews ? `<small class="text-muted">(${escapeHtml(row.reviews)})</small>` : ''}</td>
+        <td>${statusHtml}</td>
+      `;
+    } else {
+      tr.innerHTML = `
+        <td><strong>${escapeHtml(row.businessName || '—')}</strong></td>
+        <td>${escapeHtml(row.pageName || '—')}</td>
+        <td>
+          ${row.websiteUrl ? `<a href="${escapeHtml(row.websiteUrl)}" target="_blank" class="text-info text-break">${escapeHtml(truncateUrl(row.websiteUrl))}</a>` : '<span class="text-muted">—</span>'}
+        </td>
+        <td>${row.cta ? `<span class="badge bg-primary">${escapeHtml(row.cta)}</span>` : '—'}</td>
+        <td>${emailHtml}</td>
+        <td>${phoneHtml}</td>
+        <td>${waHtml}</td>
+        <td>${statusHtml}</td>
+      `;
+    }
+
     tbody.appendChild(tr);
   });
 
@@ -273,7 +406,6 @@ function renderTable() {
 function renderPagination(current, total) {
   const ul = document.getElementById('pagination');
   ul.innerHTML = '';
-
   if (total <= 1) return;
 
   const addPage = (page, label, active) => {
@@ -294,11 +426,11 @@ function renderPagination(current, total) {
     ul.appendChild(li);
   };
 
-  addPage(current - 1, '«');
+  addPage(current - 1, '\u00AB');
   for (let i = Math.max(1, current - 2); i <= Math.min(total, current + 2); i++) {
     addPage(i, i, i === current);
   }
-  addPage(current + 1, '»');
+  addPage(current + 1, '\u00BB');
 }
 
 function sortTable(column) {
@@ -356,19 +488,23 @@ async function loadSessions() {
       const time = new Date(s.createdAt).toLocaleString();
       const statusBadge = s.status === 'completed' ? 'bg-success' :
         s.status === 'error' ? 'bg-danger' : 'bg-warning';
+      const typeIcon = s.type === 'google_maps' ? 'bi-geo-alt' : 'bi-facebook';
+      const typeColor = s.type === 'google_maps' ? 'text-success' : 'text-primary';
       html += `
         <div class="list-group-item list-group-item-action d-flex justify-content-between align-items-center
           ${s.id === currentSessionId ? 'active' : ''}"
           onclick="if('${s.status}'==='completed'){ loadSession('${s.id}'); }"
           style="cursor:${s.status === 'completed' ? 'pointer' : 'default'}">
           <div>
+            <i class="bi ${typeIcon} ${typeColor} me-1"></i>
             <small class="text-muted">${time}</small>
             <span class="badge ${statusBadge} ms-2">${s.status}</span>
             ${s.id === currentSessionId ? '<span class="badge bg-primary ms-1">Current</span>' : ''}
           </div>
           <div class="text-end">
-            <small>${s.totalBusinesses || 0} businesses</small>
-            <small class="ms-2">${s.totalPhones || 0} phones</small>
+            <small>${s.totalBusinesses || 0} biz</small>
+            <small class="ms-1">${s.totalPhones || 0} ph</small>
+            <small class="ms-1">${s.totalEmails || 0} em</small>
           </div>
         </div>`;
     });
@@ -383,9 +519,20 @@ async function loadSession(sessionId) {
     const data = await response.json();
     if (data.status === 'completed' && data.results) {
       currentSessionId = sessionId;
+      currentScraperType = data.type || 'facebook';
       currentData = data.results;
-      displayResults(data.results, data.totalBusinesses, data.totalPhones);
-      document.getElementById('adsUrl').value = '';
+      displayResults(data.results, data.totalBusinesses, data.totalPhones, data.totalEmails);
+
+      if (currentScraperType === 'google_maps') {
+        const googleTab = document.getElementById('google-tab');
+        const tab = new bootstrap.Tab(googleTab);
+        tab.show();
+      } else {
+        const fbTab = document.getElementById('facebook-tab');
+        const tab = new bootstrap.Tab(fbTab);
+        tab.show();
+      }
+
       showToast('info', `Loaded session ${sessionId}`);
     }
   } catch (e) {
@@ -400,7 +547,7 @@ function escapeHtml(str) {
   return div.innerHTML;
 }
 
-function truncateUrl(url, max = 50) {
+function truncateUrl(url, max = 45) {
   return url.length > max ? url.substring(0, max) + '...' : url;
 }
 
@@ -444,5 +591,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
   document.getElementById('adsUrl').addEventListener('keydown', (e) => {
     if (e.key === 'Enter') startExtraction();
+  });
+
+  document.getElementById('gmBusinessType').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') startGoogleExtraction();
   });
 });

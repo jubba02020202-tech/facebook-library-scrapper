@@ -4,6 +4,7 @@ const { URL } = require('url');
 const config = require('../config');
 const { normalizeUrl, isValidHttpUrl, isSameDomain, getDomain, CONTACT_PATHS } = require('../utils/urlUtils');
 const { extractPhonesFromText, extractWhatsAppLinks } = require('../utils/phoneExtractor');
+const { extractEmailsFromHTML } = require('../utils/emailExtractor');
 
 const LOG_PREFIX = '[WebsiteCrawler]';
 
@@ -35,6 +36,7 @@ class WebsiteScraper {
 
     const allPhones = [];
     const allWhatsAppLinks = [];
+    const allEmails = [];
     const pagesScanned = [];
     const errors = [];
 
@@ -77,12 +79,14 @@ class WebsiteScraper {
         const telLinks = this._extractTelLinks($);
         const phonesFromText = extractPhonesFromText(pageText);
         const waLinks = extractWhatsAppLinks(pageText);
+        const emailsOnPage = extractEmailsFromHTML($);
 
         const allPhonesOnPage = [...telLinks, ...phonesFromText];
-        console.log(`${LOG_PREFIX} ${pageUrl}: ${allPhonesOnPage.length} phones, ${waLinks.length} WhatsApp links`);
+        console.log(`${LOG_PREFIX} ${pageUrl}: ${allPhonesOnPage.length} phones, ${waLinks.length} WhatsApp, ${emailsOnPage.length} emails`);
 
         allPhonesOnPage.forEach((p) => allPhones.push(p));
         waLinks.forEach((w) => allWhatsAppLinks.push(w));
+        emailsOnPage.forEach((e) => allEmails.push(e));
 
         if (visited === 1) {
           const internalLinks = this._extractInternalLinks($, url, domain);
@@ -101,16 +105,18 @@ class WebsiteScraper {
     }
 
     const { deduplicatePhones } = require('../utils/phoneExtractor');
+    const { normalizeEmails } = require('../utils/emailExtractor');
 
     const result = {
       website: url,
       phones: deduplicatePhones(allPhones),
       whatsappLinks: [...new Map(allWhatsAppLinks.map((w) => [w.phone || w, w])).values()],
+      emails: normalizeEmails(allEmails),
       pagesScanned,
       errors,
     };
 
-    console.log(`${LOG_PREFIX} Done crawling ${url}: ${result.phones.length} phones, ${result.whatsappLinks.length} WhatsApp`);
+    console.log(`${LOG_PREFIX} Done crawling ${url}: ${result.phones.length} phones, ${result.whatsappLinks.length} WhatsApp, ${result.emails.length} emails`);
     return result;
   }
 
