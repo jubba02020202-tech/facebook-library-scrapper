@@ -4,6 +4,20 @@ const { extractPhonesFromText, extractWhatsAppLinks } = require('../utils/phoneE
 
 const LOG_PREFIX = '[GoogleMaps]';
 
+const BAD_NAMES = new Set([
+  'results', 'google maps', 'google', 'maps', 'search', 'menu', 'sign in',
+  'nearby', 'explore', 'more', 'less', 'settings', 'help', 'send feedback',
+  'report a problem', 'data disclaimer', 'terms of use', 'privacy policy',
+]);
+
+function isValidBusinessName(name) {
+  if (!name || name.length < 2 || name.length > 100) return false;
+  if (BAD_NAMES.has(name.toLowerCase())) return false;
+  if (/^\d+$/.test(name)) return false;
+  if (/^(results|google|maps|search|menu|sign|nearby|explore|more|less)/i.test(name)) return false;
+  return true;
+}
+
 class GoogleMapsScraper {
 
   async scrape({ country, city, businessType }, onProgress) {
@@ -161,67 +175,111 @@ class GoogleMapsScraper {
         }
 
         const feed = await page.$('div[role="feed"]');
-        if (!feed) break;
+        if (!feed) {
+          console.log(`${LOG_PREFIX} Feed not found, trying to recover...`);
+          await page.evaluate(() => window.scrollTo(0, 0));
+          await page.waitForTimeout(2000);
+          const feedRetry = await page.$('div[role="feed"]');
+          if (!feedRetry) break;
+        }
 
-        const cards = await feed.$$('a[href*="/maps/place/"]');
+        const feedEl = await page.$('div[role="feed"]');
+        if (!feedEl) break;
+
+        const cards = await feedEl.$$('a[href*="/maps/place/"]');
         if (i >= cards.length) {
           console.log(`${LOG_PREFIX} Card index ${i} >= ${cards.length}, stopping`);
           break;
         }
 
-        const previousName = await page.evaluate(() => {
-          const h1 = document.querySelector('h1');
-          return h1 ? h1.textContent.trim() : '';
-        });
+        await page.evaluate((cardIndex) => {
+          const feed = document.querySelector('div[role="feed"]');
+          if (!feed) return;
+          const links = feed.querySelectorAll('a[href*="/maps/place/"]');
+          if (links[cardIndex]) {
+            links[cardIndex].scrollIntoView({ block: 'center' });
+          }
+        }, i);
+        await page.waitForTimeout(600);
 
-        await cards[i].scrollIntoViewIfNeeded();
-        await page.waitForTimeout(500);
-        await cards[i].click({ timeout: 5000 });
-        await page.waitForTimeout(2500);
+        const feedEl2 = await page.$('div[role="feed"]');
+        if (!feedEl2) break;
+        const cards2 = await feedEl2.$$('a[href*="/maps/place/"]');
+        if (i >= cards2.length) break;
+
+        await cards2[i].click({ timeout: 5000 });
+        await page.waitForTimeout(3000);
 
         let panelOpened = false;
-        for (let wait = 0; wait < 5; wait++) {
-          const newName = await page.evaluate(() => {
-            const h1 = document.querySelector('h1');
-            return h1 ? h1.textContent.trim() : '';
+        let detailName = '';
+
+        for (let wait = 0; wait < 8; wait++) {
+          detailName = await page.evaluate(() => {
+            const feed = document.querySelector('div[role="feed"]');
+            if (!feed) return '';
+
+            const content = feed.querySelector('div[role="main"], div.Nv2PK');
+            if (content) {
+              const h1 = content.querySelector('h1');
+              if (h1) return h1.textContent.trim();
+            }
+
+            const allH1 = feed.querySelectorAll('h1');
+            for (const h of allH1) {
+              const text = h.textContent.trim();
+              if (text && text.toLowerCase() !== 'results' && text.length > 1) {
+                return text;
+              }
+            }
+
+            const roleH1 = document.querySelector('[role="main"] h1, [data-attrid="title"] h1');
+            if (roleH1) return roleH1.textContent.trim();
+
+            return '';
           });
-          if (newName && newName !== previousName && newName.length > 1) {
+
+          if (detailName && isValidBusinessName(detailName)) {
             panelOpened = true;
             break;
           }
-          await page.waitForTimeout(800);
+
+          await page.waitForTimeout(1000);
         }
 
-        if (!panelOpened) {
-          console.log(`${LOG_PREFIX} [${i + 1}] Panel did not open, skipping`);
-          await page.keyboard.press('Escape');
+        if (!panelOpened || !isValidBusinessName(detailName)) {
+          console.log(`${LOG_PREFIX} [${i + 1}] Panel did not open or invalid name: "${detailName}", skipping`);
+          try { await page.keyboard.press('Escape'); } catch {}
           await page.waitForTimeout(1000);
           continue;
         }
 
         const detail = await this._extractBusinessDetail(page);
 
-        if (detail && detail.businessName && !seenNames.has(detail.businessName.toLowerCase())) {
+        if (detail && detail.businessName && isValidBusinessName(detail.businessName) && !seenNames.has(detail.businessName.toLowerCase())) {
           seenNames.add(detail.businessName.toLowerCase());
           businesses.push(detail);
           console.log(`${LOG_PREFIX} [${businesses.length}] ${detail.businessName} - ${detail.phone || 'no phone'} - ${detail.emails?.length || 0} emails`);
+        } else if (detail) {
+          console.log(`${LOG_PREFIX} [${i + 1}] Skipped: name="${detail.businessName}" (invalid or duplicate)`);
         }
 
-        await page.keyboard.press('Escape');
-        await page.waitForTimeout(1200);
+        try {
+          await page.keyboard.press('Escape');
+          await page.waitForTimeout(1500);
+        } catch {}
 
         const feedStillExists = await page.$('div[role="feed"]');
         if (!feedStillExists) {
-          console.log(`${LOG_PREFIX} Feed disappeared, scrolling back...`);
+          console.log(`${LOG_PREFIX} Feed disappeared, recovering...`);
           await page.evaluate(() => window.scrollTo(0, 0));
-          await page.waitForTimeout(1500);
+          await page.waitForTimeout(2000);
         }
 
       } catch (err) {
         console.log(`${LOG_PREFIX} Error extracting card ${i}: ${err.message}`);
         try {
           await page.keyboard.press('Escape');
-          await page.waitForTimeout(1000);
+          await page.waitForTimeout(1500);
         } catch {}
       }
     }
@@ -232,12 +290,37 @@ class GoogleMapsScraper {
   async _extractBusinessDetail(page) {
     try {
       const detail = await page.evaluate(() => {
-        const getName = () => {
-          const h1 = document.querySelector('h1');
-          return h1 ? h1.textContent.trim() : '';
+        const findName = () => {
+          const feed = document.querySelector('div[role="feed"]');
+          if (feed) {
+            const mainContent = feed.querySelector('div[role="main"], div.Nv2PK, div.m6QErb');
+            if (mainContent) {
+              const h1 = mainContent.querySelector('h1');
+              if (h1) return h1.textContent.trim();
+            }
+            const allH1 = feed.querySelectorAll('h1');
+            for (const h of allH1) {
+              const text = h.textContent.trim();
+              if (text && text.toLowerCase() !== 'results' && text.length > 1) {
+                return text;
+              }
+            }
+          }
+
+          const roleMain = document.querySelector('[role="main"] h1');
+          if (roleMain) return roleMain.textContent.trim();
+
+          const h1s = document.querySelectorAll('h1');
+          for (const h of h1s) {
+            const text = h.textContent.trim();
+            if (text && text.toLowerCase() !== 'results' && text.length > 2) {
+              return text;
+            }
+          }
+          return '';
         };
 
-        const getAddress = () => {
+        const findAddress = () => {
           const items = document.querySelectorAll('button[data-item-id], div[data-item-id], a[data-item-id]');
           for (const item of items) {
             const id = item.getAttribute('data-item-id') || '';
@@ -256,7 +339,7 @@ class GoogleMapsScraper {
           return '';
         };
 
-        const getPhone = () => {
+        const findPhone = () => {
           const items = document.querySelectorAll('button[data-item-id], a[data-item-id], div[data-item-id]');
           for (const item of items) {
             const id = item.getAttribute('data-item-id') || '';
@@ -273,7 +356,7 @@ class GoogleMapsScraper {
           return '';
         };
 
-        const getWebsite = () => {
+        const findWebsite = () => {
           const items = document.querySelectorAll('a[data-item-id]');
           for (const item of items) {
             const id = item.getAttribute('data-item-id') || '';
@@ -293,7 +376,7 @@ class GoogleMapsScraper {
           return '';
         };
 
-        const getRating = () => {
+        const findRating = () => {
           const spans = document.querySelectorAll('span[role="img"]');
           for (const span of spans) {
             const ariaLabel = span.getAttribute('aria-label') || '';
@@ -306,20 +389,20 @@ class GoogleMapsScraper {
           return '';
         };
 
-        const getReviews = () => {
+        const findReviews = () => {
           const text = document.body.innerText || '';
           const match = text.match(/([\d,]+)\s*review/i);
           if (match) return match[1].replace(/,/g, '');
           return '';
         };
 
-        const getCategory = () => {
+        const findCategory = () => {
           const text = document.body.innerText || '';
           const lines = text.split('\n').filter(l => l.trim());
           for (const line of lines) {
             const trimmed = line.trim();
             if (trimmed.length >= 3 && trimmed.length <= 80) {
-              if (/hospital|clinic|restaurant|hotel|school|store|shop|pharmacy|salon|garage|office|market|bank|cafe|park|gym|dentist|vet|bakery|gym|spa|travel|insurance|real estate/i.test(trimmed)) {
+              if (/hospital|clinic|restaurant|hotel|school|store|shop|pharmacy|salon|garage|office|market|bank|cafe|park|gym|dentist|dental|vet|bakery|spa|travel|insurance|real estate/i.test(trimmed)) {
                 return trimmed;
               }
             }
@@ -327,7 +410,7 @@ class GoogleMapsScraper {
           return '';
         };
 
-        const getHours = () => {
+        const findHours = () => {
           const text = document.body.innerText || '';
           const lines = text.split('\n');
           for (const line of lines) {
@@ -340,16 +423,20 @@ class GoogleMapsScraper {
         };
 
         return {
-          businessName: getName(),
-          address: getAddress(),
-          phone: getPhone(),
-          website: getWebsite(),
-          rating: getRating(),
-          reviews: getReviews(),
-          category: getCategory(),
-          hours: getHours(),
+          businessName: findName(),
+          address: findAddress(),
+          phone: findPhone(),
+          website: findWebsite(),
+          rating: findRating(),
+          reviews: findReviews(),
+          category: findCategory(),
+          hours: findHours(),
         };
       });
+
+      if (!detail.businessName || !isValidBusinessName(detail.businessName)) {
+        return null;
+      }
 
       const phones = [];
       if (detail.phone) {
